@@ -114,7 +114,7 @@ pub fn start_indexer_and_watcher(base_path: String) {
         // 1. Build initial complet
         let walker = WalkBuilder::new(&base_path)
             .hidden(false)
-            .git_ignore(true)
+            .git_ignore(false)
             .build();
             
         for entry in walker.flatten() {

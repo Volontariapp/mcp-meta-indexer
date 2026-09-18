@@ -30,6 +30,15 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
     
     // On demande à rg de renvoyer filepath:line_number:content
     let output = Command::new("rg")
+        .arg("--no-ignore")
+        .arg("--iglob")
+        .arg("**/*")
+        .arg("--iglob")
+        .arg("!**/node_modules/*/**")
+        .arg("--iglob")
+        .arg("**/node_modules/@volontariapp/**")
+        .arg("--iglob")
+        .arg("!**/.git/**")
         .arg(query)
         .arg("--line-number")
         .arg("--max-columns=150")
