@@ -103,40 +103,50 @@ fn update_file_in_graph(filepath: &str, content: &str) {
     }
 }
 
-// Initialise le graphe complet en arrière-plan et lance le watcher
+// Initialise le graphe complet de manière synchrone, puis lance le watcher en arrière-plan
 pub fn start_indexer_and_watcher(base_path: String) {
-    thread::spawn(move || {
-        eprintln!("🚀 Démarrage de l'indexation du graphe de dépendances dans '{}'...", base_path);
+    eprintln!("🚀 Démarrage de l'indexation du graphe de dépendances dans '{}'...", base_path);
+    
+    let start = std::time::Instant::now();
+    let mut file_count = 0;
+    
+    // Configurer les overrides (syntaxe identique à --iglob de ripgrep dans OverrideBuilder)
+    let mut overrides = ignore::overrides::OverrideBuilder::new(&base_path);
+    let _ = overrides.add("**/*");
+    let _ = overrides.add("!**/node_modules/*/**");
+    let _ = overrides.add("**/node_modules/@volontariapp/**");
+    let _ = overrides.add("!**/.git/**");
+    let override_set = overrides.build().unwrap_or_else(|_| ignore::overrides::Override::empty());
+    
+    // 1. Build initial complet (Synchrone)
+    let walker = WalkBuilder::new(&base_path)
+        .hidden(false)
+        .git_ignore(false)
+        .overrides(override_set)
+        .build();
         
-        let start = std::time::Instant::now();
-        let mut file_count = 0;
-        
-        // 1. Build initial complet
-        let walker = WalkBuilder::new(&base_path)
-            .hidden(false)
-            .git_ignore(false)
-            .build();
-            
-        for entry in walker.flatten() {
-            if entry.file_type().is_some_and(|ft| ft.is_file()) {
-                let path_str = entry.path().to_string_lossy();
-                if path_str.ends_with(".ts") || path_str.ends_with(".tsx") {
-                    if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                        update_file_in_graph(&path_str, &content);
-                        file_count += 1;
-                    }
+    for entry in walker.flatten() {
+        if entry.file_type().is_some_and(|ft| ft.is_file()) {
+            let path_str = entry.path().to_string_lossy();
+            if path_str.ends_with(".ts") || path_str.ends_with(".tsx") {
+                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                    update_file_in_graph(&path_str, &content);
+                    file_count += 1;
                 }
             }
         }
-        
-        eprintln!("✅ Graphe construit en {:?} ! ({} fichiers indexés)", start.elapsed(), file_count);
-        
-        // 2. Lancement du watcher
+    }
+    
+    eprintln!("✅ Graphe construit en {:?} ! ({} fichiers indexés)", start.elapsed(), file_count);
+    
+    // 2. Lancement du watcher (Asynchrone)
+    let base_path_clone = base_path.clone();
+    thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::recommended_watcher(tx).unwrap();
         
-        if let Err(e) = watcher.watch(Path::new(&base_path), RecursiveMode::Recursive) {
-            eprintln!("⚠️ Impossible de lancer le file watcher sur {}: {}", base_path, e);
+        if let Err(e) = watcher.watch(Path::new(&base_path_clone), RecursiveMode::Recursive) {
+            eprintln!("⚠️ Impossible de lancer le file watcher sur {}: {}", base_path_clone, e);
             return;
         }
         
