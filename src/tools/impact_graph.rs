@@ -125,9 +125,69 @@ pub fn resolve_workspace_root(hint: Option<&str>) -> String {
     ".".to_string()
 }
 
-// -----------------------------------------------------------------------------
-// Logique d'Indexation Multi-Passe
-// -----------------------------------------------------------------------------
+fn matches_event_or_payload(event_key: &str, node: &EventNode, query: &str) -> bool {
+    if event_key.eq_ignore_ascii_case(query) {
+        return true;
+    }
+    if let Some(iface) = &node.payload_interface {
+        if iface.eq_ignore_ascii_case(query) {
+            return true;
+        }
+    }
+    if let Some(raw) = &node.raw_value {
+        if raw.eq_ignore_ascii_case(query) {
+            return true;
+        }
+    }
+    let norm_query = query.replace('_', "").to_uppercase();
+    let norm_key = event_key.replace('_', "").to_uppercase();
+
+    if norm_query == norm_key {
+        return true;
+    }
+    if norm_query.starts_with('I') && norm_query.ends_with("PAYLOAD") && norm_query.len() > 8 {
+        let inner = &norm_query[1..norm_query.len() - 7];
+        if inner == norm_key {
+            return true;
+        }
+    }
+    if norm_key.starts_with('I') && norm_key.ends_with("PAYLOAD") && norm_key.len() > 8 {
+        let inner = &norm_key[1..norm_key.len() - 7];
+        if inner == norm_query {
+            return true;
+        }
+    }
+    false
+}
+
+fn matches_job_or_payload(job_key: &str, node: &JobNode, query: &str) -> bool {
+    if job_key.eq_ignore_ascii_case(query) {
+        return true;
+    }
+    if let Some(iface) = &node.payload_interface {
+        if iface.eq_ignore_ascii_case(query) {
+            return true;
+        }
+    }
+    if let Some(raw) = &node.raw_value {
+        if raw.eq_ignore_ascii_case(query) {
+            return true;
+        }
+    }
+    let norm_query = query.replace('_', "").to_uppercase();
+    let norm_key = job_key.replace('_', "").to_uppercase();
+
+    if norm_query == norm_key {
+        return true;
+    }
+    if norm_query.starts_with('I') && norm_query.ends_with("PAYLOAD") && norm_query.len() > 8 {
+        let inner = &norm_query[1..norm_query.len() - 7];
+        if inner == norm_key {
+            return true;
+        }
+    }
+    false
+}
 
 pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
     let mut graph = AsyncFlowGraph::default();
@@ -160,7 +220,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
             .build();
 
         for result in walker.flatten() {
-            if result.file_type().map_or(false, |ft| ft.is_file()) {
+            if result.file_type().is_some_and(|ft| ft.is_file()) {
                 let path = result.path();
                 let path_str = path.to_string_lossy();
                 if path_str.ends_with(".ts") && !path_str.ends_with(".d.ts") {
@@ -182,7 +242,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                             for cap in re_registry_entry.captures_iter(&content) {
                                 let full_key = cap[1].to_string();
                                 let iface = cap[2].to_string();
-                                let short_key = full_key.split('.').last().unwrap_or(&full_key);
+                                let short_key = full_key.split('.').next_back().unwrap_or(&full_key);
                                 if let Some(node) = graph.events.get_mut(short_key) {
                                     node.payload_interface = Some(iface);
                                 }
@@ -206,7 +266,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                             for cap in re_registry_entry.captures_iter(&content) {
                                 let full_key = cap[1].to_string();
                                 let iface = cap[2].to_string();
-                                let short_key = full_key.split('.').last().unwrap_or(&full_key);
+                                let short_key = full_key.split('.').next_back().unwrap_or(&full_key);
                                 if let Some(node) = graph.jobs.get_mut(short_key) {
                                     node.payload_interface = Some(iface);
                                 }
@@ -234,7 +294,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
         .build();
 
     for result in walker_all.flatten() {
-        if result.file_type().map_or(false, |ft| ft.is_file()) {
+        if result.file_type().is_some_and(|ft| ft.is_file()) {
             let path = result.path();
             let path_str = path.to_string_lossy().to_string();
             if !path_str.ends_with(".ts") || path_str.ends_with(".d.ts") {
@@ -250,7 +310,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
             if re_create_event_simple.is_match(&content) {
                 for cap in re_create_event.captures_iter(&content) {
                     let generic_type = cap[1].trim();
-                    let short_type = generic_type.split('.').last().unwrap_or(generic_type).to_string();
+                    let short_type = generic_type.split('.').next_back().unwrap_or(generic_type).to_string();
                     let match_start = cap.get(0).unwrap().start();
                     let match_end = cap.get(0).unwrap().end();
                     let line_num = content[..match_start].lines().count() + 1;
@@ -273,13 +333,26 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                         snippet: slice_after.chars().take(180).collect(),
                     };
 
-                    let entry = graph.events.entry(short_type.clone()).or_insert_with(|| EventNode {
+                    let mut matched_key = None;
+                    for (k, v) in &graph.events {
+                        if matches_event_or_payload(k, v, &short_type) {
+                            matched_key = Some(k.clone());
+                            break;
+                        }
+                    }
+                    let target_key = matched_key.unwrap_or_else(|| short_type.clone());
+
+                    let entry = graph.events.entry(target_key).or_insert_with(|| EventNode {
                         event_key: short_type.clone(),
                         ..Default::default()
                     });
                     
                     if stream_name.is_some() {
                         entry.stream = stream_name;
+                    }
+
+                    if entry.payload_interface.is_none() && short_type.starts_with('I') && short_type.ends_with("Payload") {
+                        entry.payload_interface = Some(short_type.clone());
                     }
 
                     entry.producers.push(endpoint);
@@ -292,7 +365,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                 for cap in re_job_target.captures_iter(&content) {
                     let full_type = cap[1].trim();
                     let clean_type = full_type.replace("typeof", "").trim().to_string();
-                    let short_type = clean_type.split('.').last().unwrap_or(&clean_type).to_string();
+                    let short_type = clean_type.split('.').next_back().unwrap_or(&clean_type).to_string();
                     let line_num = content[..cap.get(0).unwrap().start()].lines().count();
 
                     let endpoint = FlowEndpoint {
@@ -303,7 +376,16 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                         snippet: cap[0].chars().take(150).collect(),
                     };
 
-                    let entry = graph.jobs.entry(short_type.clone()).or_insert_with(|| JobNode {
+                    let mut matched_key = None;
+                    for (k, v) in &graph.jobs {
+                        if matches_job_or_payload(k, v, &short_type) {
+                            matched_key = Some(k.clone());
+                            break;
+                        }
+                    }
+                    let target_key = matched_key.unwrap_or_else(|| short_type.clone());
+
+                    let entry = graph.jobs.entry(target_key).or_insert_with(|| JobNode {
                         job_key: short_type.clone(),
                         ..Default::default()
                     });
@@ -313,7 +395,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                 // withFallback
                 for cap in re_fallback_target.captures_iter(&content) {
                     let full_type = cap[1].trim();
-                    let short_type = full_type.split('.').last().unwrap_or(full_type).to_string();
+                    let short_type = full_type.split('.').next_back().unwrap_or(full_type).to_string();
                     let line_num = content[..cap.get(0).unwrap().start()].lines().count();
 
                     let endpoint = FlowEndpoint {
@@ -324,7 +406,16 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                         snippet: cap[0].chars().take(150).collect(),
                     };
 
-                    let entry = graph.jobs.entry(short_type.clone()).or_insert_with(|| JobNode {
+                    let mut matched_key = None;
+                    for (k, v) in &graph.jobs {
+                        if matches_job_or_payload(k, v, &short_type) {
+                            matched_key = Some(k.clone());
+                            break;
+                        }
+                    }
+                    let target_key = matched_key.unwrap_or_else(|| short_type.clone());
+
+                    let entry = graph.jobs.entry(target_key).or_insert_with(|| JobNode {
                         job_key: short_type.clone(),
                         ..Default::default()
                     });
@@ -337,7 +428,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                 let class_name = cap[1].to_string();
                 let proc_type = cap[2].to_string();
                 let full_event_type = cap[3].trim().to_string();
-                let short_event = full_event_type.split('.').last().unwrap_or(&full_event_type).to_string();
+                let short_event = full_event_type.split('.').next_back().unwrap_or(&full_event_type).to_string();
                 let line_num = content[..cap.get(0).unwrap().start()].lines().count();
 
                 let consumer = ConsumerEndpoint {
@@ -348,30 +439,42 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                     processing_type: proc_type,
                 };
 
-                let entry = graph.events.entry(short_event.clone()).or_insert_with(|| EventNode {
-                    event_key: short_event.clone(),
+                let mut matched_key = None;
+                for (k, v) in &graph.events {
+                    if matches_event_or_payload(k, v, &short_event) {
+                        matched_key = Some(k.clone());
+                        break;
+                    }
+                }
+                let target_key = matched_key.unwrap_or_else(|| short_event.clone());
+
+                let entry = graph.events.entry(target_key.clone()).or_insert_with(|| EventNode {
+                    event_key: target_key.clone(),
                     ..Default::default()
                 });
+                if entry.payload_interface.is_none() && short_event.starts_with('I') && short_event.ends_with("Payload") {
+                    entry.payload_interface = Some(short_event.clone());
+                }
                 entry.consumers.push(consumer);
 
                 // Enregistrement dans l'index inversé
                 graph.consumer_to_target.entry(class_name.clone())
                     .or_default()
-                    .push(short_event.clone());
+                    .push(target_key);
             }
 
             // D. Détection des Consommateurs de Jobs (Workers & Handlers)
             if let Some(cap) = re_job_handler.captures(&content) {
                 let class_name = cap[1].to_string();
                 let mut target_job = cap[2].replace("typeof", "").trim().to_string();
-                if let Some(short) = target_job.split('.').last() {
+                if let Some(short) = target_job.split('.').next_back() {
                     target_job = short.to_string();
                 }
 
                 // Si le jobType est redéfini dans le corps (ex: `readonly jobType = JobMessagingType.PUBLISH_EVENT`)
                 if let Some(fcap) = re_job_type_field.captures(&content) {
                     let field_val = fcap[1].trim();
-                    if let Some(short) = field_val.split('.').last() {
+                    if let Some(short) = field_val.split('.').next_back() {
                         target_job = short.to_string();
                     }
                 }
@@ -385,8 +488,17 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                     processing_type: "IJobHandler".to_string(),
                 };
 
-                let entry = graph.jobs.entry(target_job.clone()).or_insert_with(|| JobNode {
-                    job_key: target_job.clone(),
+                let mut matched_key = None;
+                for (k, v) in &graph.jobs {
+                    if matches_job_or_payload(k, v, &target_job) {
+                        matched_key = Some(k.clone());
+                        break;
+                    }
+                }
+                let resolved_job = matched_key.unwrap_or_else(|| target_job.clone());
+
+                let entry = graph.jobs.entry(resolved_job.clone()).or_insert_with(|| JobNode {
+                    job_key: resolved_job.clone(),
                     ..Default::default()
                 });
                 entry.handlers.push(consumer);
@@ -394,10 +506,11 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
                 // Index inversé
                 graph.consumer_to_target.entry(class_name.clone())
                     .or_default()
-                    .push(target_job.clone());
+                    .push(resolved_job);
             }
         }
     }
+
 
     // 3. Liaison automatique des Sagas (Triade d'événements)
     let event_keys: Vec<String> = graph.events.keys().cloned().collect();
@@ -497,23 +610,21 @@ pub fn start_indexer_and_watcher(root_dir: String) {
             return;
         }
 
-        for res in rx {
-            if let Ok(Event { kind, paths, .. }) = res {
-                match kind {
-                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_) => {
-                        let should_reindex = paths.iter().any(|p| {
-                            let s = p.to_string_lossy();
-                            s.ends_with(".ts") && !s.contains("/dist/") && !s.contains("/node_modules/")
-                        });
+        for Event { kind, paths, .. } in rx.into_iter().flatten() {
+            match kind {
+                EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_) => {
+                    let should_reindex = paths.iter().any(|p| {
+                        let s = p.to_string_lossy();
+                        s.ends_with(".ts") && !s.contains("/dist/") && !s.contains("/node_modules/")
+                    });
 
-                        if should_reindex {
-                            let updated = build_impact_graph(&root_clone);
-                            let mut global = IMPACT_GRAPH.write().unwrap();
-                            *global = updated;
-                        }
+                    if should_reindex {
+                        let updated = build_impact_graph(&root_clone);
+                        let mut global = IMPACT_GRAPH.write().unwrap();
+                        *global = updated;
                     }
-                    _ => {}
                 }
+                _ => {}
             }
         }
     });
@@ -539,18 +650,18 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
     // 1. Recherche par Événement
     for (key, event) in &graph.events {
         let matches_key = key.to_uppercase().contains(&target_upper);
-        let matches_raw = event.raw_value.as_ref().map_or(false, |r| r.to_lowercase().contains(&target_lower));
+        let matches_raw = event.raw_value.as_ref().is_some_and(|r| r.to_lowercase().contains(&target_lower));
 
         if matches_key || matches_raw {
             found = true;
-            out.push_str(&format!("================================================================================\n"));
+            out.push_str("================================================================================\n");
             out.push_str(&format!("⚡ ÉVÉNEMENT DISTRIBUÉ : {}\n", key));
             if let Some(raw) = &event.raw_value {
                 out.push_str(&format!("   Valeur Bus : '{}'\n", raw));
             }
-            out.push_str(&format!("================================================================================\n"));
+            out.push_str("================================================================================\n");
 
-            out.push_str(&format!("📜 Contrat & Payload :\n"));
+            out.push_str("📜 Contrat & Payload :\n");
             if let Some(iface) = &event.payload_interface {
                 out.push_str(&format!("   - Interface Payload : {}\n", iface));
             }
@@ -583,7 +694,7 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
 
             // Sagas & Rollback
             if event.saga_success.is_some() || event.saga_failure.is_some() {
-                out.push_str(&format!("\n🔄 Triade de Saga (Chorégraphie & Compensations) :\n"));
+                out.push_str("\n🔄 Triade de Saga (Chorégraphie & Compensations) :\n");
                 if let Some(succ) = &event.saga_success {
                     out.push_str(&format!("   - Succès (Commit -> SagaStatus.DONE)   : {}\n", succ));
                 }
@@ -598,18 +709,18 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
     // 2. Recherche par Job
     for (key, job) in &graph.jobs {
         let matches_key = key.to_uppercase().contains(&target_upper);
-        let matches_raw = job.raw_value.as_ref().map_or(false, |r| r.to_lowercase().contains(&target_lower));
+        let matches_raw = job.raw_value.as_ref().is_some_and(|r| r.to_lowercase().contains(&target_lower));
 
         if matches_key || matches_raw {
             found = true;
-            out.push_str(&format!("================================================================================\n"));
+            out.push_str("================================================================================\n");
             out.push_str(&format!("🛠️ JOB D'ARRIÈRE-PLAN (1:1) : {}\n", key));
             if let Some(raw) = &job.raw_value {
                 out.push_str(&format!("   Valeur Job : '{}'\n", raw));
             }
-            out.push_str(&format!("================================================================================\n"));
+            out.push_str("================================================================================\n");
 
-            out.push_str(&format!("📜 Contrat & Payload :\n"));
+            out.push_str("📜 Contrat & Payload :\n");
             if let Some(iface) = &job.payload_interface {
                 out.push_str(&format!("   - Interface Payload : {}\n", iface));
             }
@@ -647,10 +758,10 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
     for (consumer_name, targets) in &graph.consumer_to_target {
         if consumer_name.to_lowercase().contains(&target_lower) {
             found = true;
-            out.push_str(&format!("================================================================================\n"));
+            out.push_str("================================================================================\n");
             out.push_str(&format!("🔍 NAVIGATION INVERSÉE (Upstream Trace) pour '{}'\n", consumer_name));
-            out.push_str(&format!("================================================================================\n"));
-            out.push_str(&format!("Cette classe consomme les événements / jobs suivants :\n"));
+            out.push_str("================================================================================\n");
+            out.push_str("Cette classe consomme les événements / jobs suivants :\n");
             let mut unique_targets: Vec<&String> = targets.iter().collect();
             unique_targets.sort();
             unique_targets.dedup();
@@ -700,8 +811,126 @@ mod tests {
     }
 
     #[test]
+    fn test_mock_impact_graph_indexing() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "mcp_impact_test_{}",
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+
+        let events_dir = temp_dir.join("npm-packages/packages/messaging/src/events/user");
+        let jobs_dir = temp_dir.join("npm-packages/packages/messaging/src/jobs/mail");
+        let service_dir = temp_dir.join("ms-user/src");
+        let post_processor_dir = temp_dir.join("post-processors-runner/src");
+
+        std::fs::create_dir_all(&events_dir).unwrap();
+        std::fs::create_dir_all(&jobs_dir).unwrap();
+        std::fs::create_dir_all(&service_dir).unwrap();
+        std::fs::create_dir_all(&post_processor_dir).unwrap();
+
+        // 1. Contrat d'événements avec triade de saga
+        std::fs::write(
+            events_dir.join("payloads.ts"),
+            r#"
+            export enum UserEventMessagingType {
+              USER_CREATED = 'user.created',
+              USER_CREATION_SUCCESSFULL = 'user.creation_successfull',
+              USER_CREATION_FAILED = 'user.creation_failed',
+            }
+            export interface IUserCreatedPayload { id: string; }
+            export interface EventRegistry {
+              [UserEventMessagingType.USER_CREATED]: IUserCreatedPayload;
+            }
+            "#,
+        ).unwrap();
+
+        // 2. Contrat de jobs
+        std::fs::write(
+            jobs_dir.join("payloads.ts"),
+            r#"
+            export enum MailJobMessagingType {
+              SEND_EMAIL = 'mail.send_email',
+            }
+            export interface ISendEmailPayload { to: string; }
+            export interface JobRegistry {
+              [MailJobMessagingType.SEND_EMAIL]: ISendEmailPayload;
+            }
+            "#,
+        ).unwrap();
+
+        // 3. Émetteurs dans ms-user
+        std::fs::write(
+            service_dir.join("user.service.ts"),
+            r#"
+            EventQueueEntity.createEvent<IUserCreatedPayload>(Streams.USER_STREAM, { id: '123' });
+            JobsOutboxEntity.createJob<ISendEmailPayload>('mail.send_email', { to: 'test@example.com' });
+            "#,
+        ).unwrap();
+
+        // 4. Consommateur post-processor avec toGatewayWs
+        std::fs::write(
+            post_processor_dir.join("user-created.post-processor.ts"),
+            r#"
+            export class UserCreatedPostProcessor extends BatchPostProcessor<IUserCreatedPayload> {
+              async handle(events: IUserCreatedPayload[]) {
+                await this.toGatewayWs({ type: 'USER_CREATED' });
+              }
+            }
+            "#,
+        ).unwrap();
+
+        // 5. Worker Job Handler
+        std::fs::write(
+            service_dir.join("mail.worker.ts"),
+            r#"
+            export class SendEmailHandler implements IJobHandler<ISendEmailPayload> {
+              async execute(job: ISendEmailPayload) {}
+            }
+            "#,
+        ).unwrap();
+
+        let temp_dir_str = temp_dir.to_str().unwrap();
+        let graph = build_impact_graph(temp_dir_str);
+
+        assert!(graph.events.contains_key("USER_CREATED"), "USER_CREATED doit être indexé");
+        let user_created = &graph.events["USER_CREATED"];
+        assert_eq!(user_created.saga_success.as_deref(), Some("USER_CREATION_SUCCESSFULL"));
+        assert_eq!(user_created.saga_failure.as_deref(), Some("USER_CREATION_FAILED"));
+        assert_eq!(user_created.producers.len(), 1, "Doit avoir 1 émetteur");
+        assert_eq!(user_created.consumers.len(), 1, "Doit avoir 1 consommateur");
+
+        assert!(graph.jobs.contains_key("SEND_EMAIL"), "SEND_EMAIL doit être indexé");
+        let send_email = &graph.jobs["SEND_EMAIL"];
+        assert_eq!(send_email.handlers.len(), 1, "Doit avoir 1 handler");
+
+        // Test d'exécution dans IMPACT_GRAPH
+        {
+            let mut global = IMPACT_GRAPH.write().unwrap();
+            *global = graph;
+        }
+
+        let res_event = execute(json!({ "target": "USER_CREATED" })).unwrap();
+        let text_event = &res_event.content[0].text;
+        assert!(text_event.contains("ÉVÉNEMENT DISTRIBUÉ : USER_CREATED"));
+        assert!(text_event.contains("IUserCreatedPayload"));
+        assert!(text_event.contains("USER_CREATION_SUCCESSFULL"));
+
+        let res_rev = execute(json!({ "target": "UserCreatedPostProcessor", "direction": "upstream" })).unwrap();
+        let text_rev = &res_rev.content[0].text;
+        assert!(text_rev.contains("NAVIGATION INVERSÉE"));
+        assert!(text_rev.contains("USER_CREATED"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
     fn test_real_impact_graph_indexing() {
         let root = resolve_workspace_root(Some("../"));
+        let messaging_dir = std::path::Path::new(&root).join("npm-packages/packages/messaging");
+        if !messaging_dir.exists() {
+            eprintln!("Skipping integration test: {:?} not found (running in isolated CI)", messaging_dir);
+            return;
+        }
+
         let graph = build_impact_graph(&root);
         eprintln!("Indexed {} events, {} jobs", graph.events.len(), graph.jobs.len());
         assert!(!graph.events.is_empty(), "Doit indexer au moins un événement depuis messaging");
@@ -719,7 +948,6 @@ mod tests {
         // Test de requête sur un événement
         let res_event = execute(json!({ "target": "EVENT_CREATED" })).unwrap();
         let text_event = &res_event.content[0].text;
-        eprintln!("Event Query Output:\n{}", text_event);
         assert!(text_event.contains("ÉVÉNEMENT DISTRIBUÉ : EVENT_CREATED"));
         assert!(text_event.contains("IEventCreatedPayload"));
         assert!(text_event.contains("Triade de Saga"));
@@ -727,15 +955,14 @@ mod tests {
         // Test de requête sur un job
         let res_job = execute(json!({ "target": "PUBLISH_EVENT" })).unwrap();
         let text_job = &res_job.content[0].text;
-        eprintln!("Job Query Output:\n{}", text_job);
         assert!(text_job.contains("JOB D'ARRIÈRE-PLAN (1:1) : PUBLISH_EVENT"));
 
         // Test de recherche inversée
         let res_rev = execute(json!({ "target": "EventCreatedPostProcessor" })).unwrap();
         let text_rev = &res_rev.content[0].text;
-        eprintln!("Reverse Query Output:\n{}", text_rev);
         assert!(text_rev.contains("NAVIGATION INVERSÉE"));
         assert!(text_rev.contains("EVENT_CREATED"));
     }
 }
+
 
