@@ -48,13 +48,13 @@ pub fn parse_file_context(filepath: &str, target_line_1_indexed: usize) -> Resul
     
     let is_ts = filepath.ends_with(".ts") || filepath.ends_with(".tsx");
     let language = if filepath.ends_with(".rs") {
-        tree_sitter_rust::language()
+        tree_sitter_rust::LANGUAGE.into()
     } else if filepath.ends_with(".json") {
-        tree_sitter_json::language()
+        tree_sitter_json::LANGUAGE.into()
     } else if filepath.ends_with(".yaml") || filepath.ends_with(".yml") {
         tree_sitter_yaml::LANGUAGE.into()
     } else {
-        tree_sitter_typescript::language_typescript()
+        tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
     };
     
     parser.set_language(&language).map_err(|e| e.to_string())?;
@@ -62,7 +62,6 @@ pub fn parse_file_context(filepath: &str, target_line_1_indexed: usize) -> Resul
     let tree = parser.parse(&source_code, None).ok_or("Failed to parse tree")?;
     let root_node = tree.root_node();
 
-    // 1. Extraire tous les imports (uniquement pour TS pour l'instant)
     let mut imports = String::new();
     if is_ts {
         let mut cursor = root_node.walk();

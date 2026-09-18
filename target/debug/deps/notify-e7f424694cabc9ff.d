@@ -1,0 +1,11 @@
+/Users/victoragahi/Developer/meta/mcp-meta-indexer/target/debug/deps/notify-e7f424694cabc9ff.d: /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/lib.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/fsevent.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/event.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/null.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/poll.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/config.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/error.rs
+
+/Users/victoragahi/Developer/meta/mcp-meta-indexer/target/debug/deps/libnotify-e7f424694cabc9ff.rmeta: /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/lib.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/fsevent.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/event.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/null.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/poll.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/config.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/error.rs
+
+/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/lib.rs:
+/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/fsevent.rs:
+/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/event.rs:
+/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/null.rs:
+/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/poll.rs:
+/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/config.rs:
+/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-6.1.1/src/error.rs:
