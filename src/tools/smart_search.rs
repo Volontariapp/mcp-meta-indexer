@@ -66,12 +66,18 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
                 
                 final_result.push_str(&format!("\n=== Fichier: {} ===\n", filepath));
                 
-                // Si c'est du TypeScript, on utilise l'AST
-                if filepath.ends_with(".ts") || filepath.ends_with(".tsx") {
+                // Si c'est un format supporté par notre AST Multi-langage
+                if filepath.ends_with(".ts") || filepath.ends_with(".tsx") 
+                   || filepath.ends_with(".rs") 
+                   || filepath.ends_with(".json") 
+                   || filepath.ends_with(".yaml") || filepath.ends_with(".yml") {
+                    
                     if let Ok(context) = crate::tools::ast_parser::parse_file_context(&full_path, line_num) {
-                        final_result.push_str("--- Imports (Contrats & Dépendances) ---\n");
-                        final_result.push_str(&context.imports);
-                        final_result.push_str("\n--- Contexte Sémantique ---\n");
+                        if !context.imports.is_empty() {
+                            final_result.push_str("--- Imports (Contrats & Dépendances) ---\n");
+                            final_result.push_str(&context.imports);
+                        }
+                        final_result.push_str("\n--- Contexte Sémantique (Minifié RTK) ---\n");
                         final_result.push_str(&context.target_block);
                         final_result.push_str("\n");
                     } else {
