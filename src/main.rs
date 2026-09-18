@@ -57,8 +57,12 @@ async fn main() {
 async fn handle_request(req: JsonRpcRequest) -> JsonRpcResponse {
     let result = match req.method.as_str() {
         "initialize" => {
+            let protocol_version = req.params.get("protocolVersion")
+                .and_then(|v| v.as_str())
+                .unwrap_or("2026-09-11");
+                
             Ok(json!({
-                "protocolVersion": "2026-09-11",
+                "protocolVersion": protocol_version,
                 "capabilities": {
                     "tools": {}
                 },
