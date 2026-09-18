@@ -56,6 +56,21 @@ async fn main() {
 
 async fn handle_request(req: JsonRpcRequest) -> JsonRpcResponse {
     let result = match req.method.as_str() {
+        "initialize" => {
+            Ok(json!({
+                "protocolVersion": "2026-09-11",
+                "capabilities": {
+                    "tools": {}
+                },
+                "serverInfo": {
+                    "name": "mcp-meta-indexer",
+                    "version": "0.1.0"
+                }
+            }))
+        }
+        "notifications/initialized" => {
+            Ok(json!({})) // Simple ack for the notification
+        }
         "tools/list" => {
             let tool1 = tools::smart_search::get_tool_definition();
             let tool2 = tools::dependency_graph::get_tool_definition();
