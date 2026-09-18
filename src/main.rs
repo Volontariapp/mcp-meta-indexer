@@ -42,13 +42,37 @@ async fn main() {
                 break; // EOF
             }
 
-            if let Ok(request) = serde_json::from_str::<JsonRpcRequest>(&buffer) {
-                let response = handle_request(request).await;
-                let response_json = serde_json::to_string(&response).unwrap();
-                println!("{}", response_json);
-                io::stdout().flush().unwrap();
-            } else {
-                eprintln!("Erreur de parsing JSON-RPC: {}", buffer);
+            let trimmed = buffer.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            match serde_json::from_str::<Value>(trimmed) {
+                Ok(raw) => {
+                    // Les notifications n'ont pas de "id" — on les traite sans répondre
+                    let has_id = raw.get("id").is_some();
+                    let method = raw.get("method").and_then(|m| m.as_str()).unwrap_or("");
+
+                    // Notifications (pas de réponse attendue)
+                    if !has_id && method.starts_with("notifications/") {
+                        continue;
+                    }
+
+                    match serde_json::from_value::<JsonRpcRequest>(raw) {
+                        Ok(request) => {
+                            let response = handle_request(request).await;
+                            let response_json = serde_json::to_string(&response).unwrap();
+                            println!("{}", response_json);
+                            io::stdout().flush().unwrap();
+                        }
+                        Err(e) => {
+                            eprintln!("Erreur de parsing JsonRpcRequest: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Erreur de parsing JSON: {} | input: {}", e, trimmed);
+                }
             }
         }
     }
