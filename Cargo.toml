@@ -13,3 +13,7 @@ tower-http = { version = "0.5", features = ["cors"] }
 futures-util = "0.3"
 tree-sitter = "0.22"
 tree-sitter-typescript = "0.21"
+notify = "6.1"
+ignore = "0.4"
+regex = "1.10"
+once_cell = "1.19"

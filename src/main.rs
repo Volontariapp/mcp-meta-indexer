@@ -13,6 +13,10 @@ use tower_http::cors::CorsLayer;
 
 #[tokio::main]
 async fn main() {
+    // Lancement de l'indexation et du file watcher en arrière-plan
+    // Le dossier ".." pointe sur le monorepo (meta) car le serveur est exécuté depuis mcp-meta-indexer
+    tools::dependency_graph::start_indexer_and_watcher("../".to_string());
+
     let transport = env::var("MCP_TRANSPORT").unwrap_or_else(|_| "stdio".to_string());
 
     if transport == "sse" {
@@ -51,14 +55,21 @@ async fn main() {
 async fn handle_request(req: JsonRpcRequest) -> JsonRpcResponse {
     let result = match req.method.as_str() {
         "tools/list" => {
-            let tool = tools::smart_search::get_tool_definition();
-            Ok(json!({ "tools": [tool] }))
+            let tool1 = tools::smart_search::get_tool_definition();
+            let tool2 = tools::dependency_graph::get_tool_definition();
+            Ok(json!({ "tools": [tool1, tool2] }))
         }
         "tools/call" => {
             let name = req.params.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let args = req.params.get("arguments").cloned().unwrap_or(json!({}));
+            
             if name == "smart_search" {
-                let args = req.params.get("arguments").cloned().unwrap_or(json!({}));
                 match tools::smart_search::execute(args) {
+                    Ok(res) => Ok(serde_json::to_value(res).unwrap()),
+                    Err(e) => Err(JsonRpcError { code: -32603, message: e }),
+                }
+            } else if name == "find_dependents" {
+                match tools::dependency_graph::execute(args) {
                     Ok(res) => Ok(serde_json::to_value(res).unwrap()),
                     Err(e) => Err(JsonRpcError { code: -32603, message: e }),
                 }
