@@ -20,7 +20,7 @@ async fn main() {
     let transport = env::var("MCP_TRANSPORT").unwrap_or_else(|_| "stdio".to_string());
 
     if transport == "sse" {
-        println!("Démarrage du serveur MCP via SSE sur le port 3000...");
+        eprintln!("Démarrage du serveur MCP via SSE sur le port 3000...");
         let app = Router::new()
             .route("/sse", get(sse_handler))
             .route("/messages", post(messages_handler))

@@ -106,7 +106,7 @@ fn update_file_in_graph(filepath: &str, content: &str) {
 // Initialise le graphe complet en arrière-plan et lance le watcher
 pub fn start_indexer_and_watcher(base_path: String) {
     thread::spawn(move || {
-        println!("🚀 Démarrage de l'indexation du graphe de dépendances dans '{}'...", base_path);
+        eprintln!("🚀 Démarrage de l'indexation du graphe de dépendances dans '{}'...", base_path);
         
         let start = std::time::Instant::now();
         let mut file_count = 0;
@@ -129,18 +129,18 @@ pub fn start_indexer_and_watcher(base_path: String) {
             }
         }
         
-        println!("✅ Graphe construit en {:?} ! ({} fichiers indexés)", start.elapsed(), file_count);
+        eprintln!("✅ Graphe construit en {:?} ! ({} fichiers indexés)", start.elapsed(), file_count);
         
         // 2. Lancement du watcher
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::recommended_watcher(tx).unwrap();
         
         if let Err(e) = watcher.watch(Path::new(&base_path), RecursiveMode::Recursive) {
-            println!("⚠️ Impossible de lancer le file watcher sur {}: {}", base_path, e);
+            eprintln!("⚠️ Impossible de lancer le file watcher sur {}: {}", base_path, e);
             return;
         }
         
-        println!("👀 File watcher actif sur la codebase Volontariapp.");
+        eprintln!("👀 File watcher actif sur la codebase Volontariapp.");
         
         for res in rx {
             match res {
@@ -151,7 +151,7 @@ pub fn start_indexer_and_watcher(base_path: String) {
                         if path_str.ends_with(".ts") || path_str.ends_with(".tsx") {
                             if let Ok(content) = std::fs::read_to_string(&path) {
                                 update_file_in_graph(&path_str, &content);
-                                println!("🔄 Graphe mis à jour suite à la modification de {}", path_str);
+                                eprintln!("🔄 Graphe mis à jour suite à la modification de {}", path_str);
                             }
                         }
                     }
