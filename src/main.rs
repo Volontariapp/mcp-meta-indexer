@@ -15,7 +15,9 @@ use tower_http::cors::CorsLayer;
 async fn main() {
     // Lancement de l'indexation et du file watcher en arrière-plan
     // Le dossier ".." pointe sur le monorepo (meta) car le serveur est exécuté depuis mcp-meta-indexer
-    tools::dependency_graph::start_indexer_and_watcher("../".to_string());
+    std::thread::spawn(|| {
+        tools::dependency_graph::start_indexer_and_watcher("../".to_string());
+    });
 
     let transport = env::var("MCP_TRANSPORT").unwrap_or_else(|_| "stdio".to_string());
 
