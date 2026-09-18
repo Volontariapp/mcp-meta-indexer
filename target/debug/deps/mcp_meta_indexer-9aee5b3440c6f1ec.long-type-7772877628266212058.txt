@@ -1,1 +1,0 @@
-tree_sitter::Language: std::convert::From<tree_sitter_language::LanguageFn>

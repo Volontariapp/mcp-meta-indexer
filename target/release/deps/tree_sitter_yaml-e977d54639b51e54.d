@@ -1,9 +1,0 @@
-/Users/victoragahi/Developer/meta/mcp-meta-indexer/target/release/deps/tree_sitter_yaml-e977d54639b51e54.d: /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/lib.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/../../src/node-types.json /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/../../queries/highlights.scm
-
-/Users/victoragahi/Developer/meta/mcp-meta-indexer/target/release/deps/libtree_sitter_yaml-e977d54639b51e54.rlib: /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/lib.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/../../src/node-types.json /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/../../queries/highlights.scm
-
-/Users/victoragahi/Developer/meta/mcp-meta-indexer/target/release/deps/libtree_sitter_yaml-e977d54639b51e54.rmeta: /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/lib.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/../../src/node-types.json /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/../../queries/highlights.scm
-
-/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/lib.rs:
-/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/../../src/node-types.json:
-/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-yaml-0.7.2/bindings/rust/../../queries/highlights.scm:

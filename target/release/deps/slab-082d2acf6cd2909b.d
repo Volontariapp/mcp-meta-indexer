@@ -1,8 +1,0 @@
-/Users/victoragahi/Developer/meta/mcp-meta-indexer/target/release/deps/slab-082d2acf6cd2909b.d: /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/lib.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/builder.rs
-
-/Users/victoragahi/Developer/meta/mcp-meta-indexer/target/release/deps/libslab-082d2acf6cd2909b.rlib: /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/lib.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/builder.rs
-
-/Users/victoragahi/Developer/meta/mcp-meta-indexer/target/release/deps/libslab-082d2acf6cd2909b.rmeta: /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/lib.rs /Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/builder.rs
-
-/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/lib.rs:
-/Users/victoragahi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/slab-0.4.12/src/builder.rs:
