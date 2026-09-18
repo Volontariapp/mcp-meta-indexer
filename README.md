@@ -34,7 +34,7 @@ sequenceDiagram
     participant RG as Ripgrep
     participant TS as Tree-sitter (AST)
     
-    IA->>MCP: Call tool smart_search(query)
+    IA->>MCP: Call tool smart_search(query, scope)
     MCP->>RG: rg "query" --line-number (Filtrage ultra-rapide)
     RG-->>MCP: file.ts:42: match text
     
@@ -42,12 +42,50 @@ sequenceDiagram
         MCP->>TS: Parse AST
         TS-->>MCP: Arbre syntaxique
         MCP->>MCP: 1. Extraction des imports
-        MCP->>MCP: 2. Remontée AST vers le Bloc Parent
+        MCP->>MCP: 2. Remontée AST vers le Bloc Parent (target_block)
         MCP->>MCP: 3. Minification RTK (Suppression espaces/commentaires)
+        MCP->>MCP: 4. extract_skeleton() → signatures de tous les autres nœuds
     end
     
-    MCP-->>IA: Mini-Graphe compressé (Imports + Code)
+    MCP-->>IA: Imports + target_block + Squelette du Fichier
 ```
+
+### AST Skeletonization
+
+En plus du bloc ciblé, chaque résultat inclut désormais le **squelette architectural** du fichier : les signatures de toutes les déclarations *non-ciblées*, sans leurs corps. L'IA obtient une vue complète du fichier pour ~10% du coût en tokens d'une lecture intégrale.
+
+**Format de sortie enrichi :**
+```
+=== Fichier: ms-user/src/.../user.service.ts ===
+--- Imports (Contrats & Dépendances) ---
+import { InjectRepository } from '@nestjs/typeorm';
+...
+
+--- Contexte Sémantique (Minifié RTK) ---
+async findById(id: string): Promise<User> {   ← bloc matché complet
+  ...
+}
+
+--- Squelette du Fichier ---
+export class UserService {                     ← les autres déclarations
+  constructor(repo: UserRepository, bus: EventBus)  // [L.12]
+  async update(id: string, dto: UpdateUserDto)      // [L.41]
+  private validate(user: User): void                // [L.78]
+}
+```
+
+**Règles de profondeur du skeleton :**
+
+| Nœud AST                                       | Comportement                                    |
+| ------------------------------------------------| -------------------------------------------------|
+| `export_statement > class`                     | Unwrap 2 niveaux + membres de classe (1 niveau) |
+| `export_statement > function`                  | Unwrap 2 niveaux → signature                    |
+| `class_declaration`                            | Signature + membres 1 niveau                    |
+| `function_declaration` / `lexical_declaration` | Première ligne seulement                        |
+| `impl_item` / `trait_item` (Rust)              | Signature + méthodes 1 niveau                   |
+| `struct_item` / `enum_item` (Rust)             | Première ligne seulement                        |
+| JSON / YAML                                    | Pas de skeleton (non pertinent)                 |
+
 
 ### Graphe de Dépendance en Mémoire (`find_dependents`)
 
@@ -77,10 +115,12 @@ graph TD
         C[("Volume Partagé: /code (emptyDir)")]
     end
     
-    D["Github (Monorepo meta)"] -->|"Clone SSH toutes les 60s"| A
+    D["Github (Monorepo meta)"] -->|"Clone HTTPS toutes les 60s"| A
     A -->|"Ecriture"| C
     B -->|"Lecture / Recherche (ripgrep + AST)"| C
 ```
+
+> **Note :** Le sidecar `git-sync` clone via HTTPS uniquement. Les URLs SSH dans les `.gitmodules` imbriqués sont incompatibles avec l'environnement du pod (uid 1001 sans clé SSH).
 
 ## CI/CD
 
