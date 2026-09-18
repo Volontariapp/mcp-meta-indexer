@@ -1,0 +1,16 @@
+{
+  "ci-safety-gate": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./skills/mcp-indexer-workflows/scripts/pre-commit-check.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
