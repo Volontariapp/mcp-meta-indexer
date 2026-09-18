@@ -1,4 +1,4 @@
-FROM rust:1.85-alpine AS builder
+FROM rust:1.98-alpine AS builder
 
 RUN apk add --no-cache musl-dev gcc g++ make binutils
 WORKDIR /usr/src/mcp-meta-indexer
