@@ -5,6 +5,8 @@ Ce serveur expose des outils pour les environnements de développement locaux et
 
 ## Architecture & Fonctionnement
 
+> **Configuration de l'IA :** Pour les développeurs souhaitant configurer ce serveur pour leur environnement local (Claude / Antigravity), veuillez consulter le guide [SETUP.md](./SETUP.md).
+
 Le serveur est conçu avec une architecture hybride qui lui permet de fonctionner aussi bien sur la machine locale d'un développeur que déployé sur un cluster Kubernetes.
 
 ### Architecture Hybride (Local vs Distant)
