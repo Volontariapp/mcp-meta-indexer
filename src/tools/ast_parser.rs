@@ -52,7 +52,7 @@ pub fn parse_file_context(filepath: &str, target_line_1_indexed: usize) -> Resul
     } else if filepath.ends_with(".json") {
         tree_sitter_json::language()
     } else if filepath.ends_with(".yaml") || filepath.ends_with(".yml") {
-        tree_sitter_yaml::language()
+        tree_sitter_yaml::LANGUAGE.into()
     } else {
         tree_sitter_typescript::language_typescript()
     };
