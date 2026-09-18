@@ -19,9 +19,6 @@ graph TD
     B -->|"Distant (SSE)"| E["Cluster K8s / Tailscale"]
     E -->|"Requêtes HTTP/SSE"| F["Pod mcp-meta-indexer"]
     F -->|Accès| G["Volume Code / Git Sync"]
-    
-    style C fill:#f9f,stroke:#333,stroke-width:2px
-    style F fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
 ### Mécanique de Recherche Sémantique (`smart_search`)
@@ -39,14 +36,48 @@ sequenceDiagram
     MCP->>RG: rg "query" --line-number (Filtrage ultra-rapide)
     RG-->>MCP: file.ts:42: match text
     
-    loop Pour chaque fichier TypeScript trouvé
-        MCP->>TS: Parse AST(file.ts)
+    loop Pour chaque fichier trouvé (.ts, .rs, .json, .yaml)
+        MCP->>TS: Parse AST
         TS-->>MCP: Arbre syntaxique
-        MCP->>MCP: 1. Extraction de TOUS les imports (Contrats, Dépendances)
-        MCP->>MCP: 2. Remontée AST depuis la ligne 42 jusqu'au Bloc Parent (Classe/Méthode)
+        MCP->>MCP: 1. Extraction des imports
+        MCP->>MCP: 2. Remontée AST vers le Bloc Parent
+        MCP->>MCP: 3. Minification RTK (Suppression espaces/commentaires)
     end
     
-    MCP-->>IA: Mini-Graphe (Imports + Code Bloc Parent)
+    MCP-->>IA: Mini-Graphe compressé (Imports + Code)
+```
+
+### Graphe de Dépendance en Mémoire (`find_dependents`)
+
+Pour une résolution instantanée des composants, le serveur maintient un graphe asynchrone des imports.
+
+```mermaid
+graph LR
+    A["Démarrage MCP"] --> B["Thread d'Indexation (Background)"]
+    B --> C["Scan complet des 17 repos"]
+    C --> D[("HashMap en Mémoire")]
+    
+    E["File Watcher (notify)"] -->|Fichier modifié| D
+    
+    IA["Agent IA"] -->|"Qui importe UserAuthRequest ?"| D
+    D -->|"O(1) Résolution"| IA
+```
+
+### Déploiement Kubernetes (Git-Sync)
+
+Sur le cluster, le serveur accède aux 17 repositories via le pattern "Sidecar Git-Sync", évitant d'inclure le code source dans l'image Docker.
+
+```mermaid
+graph TD
+    subgraph Pod mcp-meta-indexer
+        A["Conteneur : git-sync"]
+        B["Conteneur : mcp-meta-indexer (Rust)"]
+        C[("Volume Partagé: /code (emptyDir)")]
+    end
+    
+    D["Github (Monorepo meta)"] -->|"Clone SSH toutes les 60s"| A
+    A -->|"Ecriture"| C
+    B -->|"Lecture / Recherche (ripgrep + AST)"| C
 ```
 
 ## CI/CD
