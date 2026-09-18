@@ -9,7 +9,7 @@ use regex::Regex;
 use ignore::WalkBuilder;
 use notify::{Watcher, RecursiveMode, Event, EventKind};
 
-// Le graphe en mémoire : clé = symbole ou package importé, valeur = ensemble de fichiers (chemins relatifs)
+#[allow(clippy::type_complexity)]
 pub static DEPENDENCY_GRAPH: Lazy<Arc<RwLock<HashMap<String, HashSet<String>>>>> = 
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
@@ -99,7 +99,7 @@ fn update_file_in_graph(filepath: &str, content: &str) {
     // L'approche basique ici est d'ajouter le fichier aux nouveaux symboles sans nettoyage profond,
     // ce qui est suffisant pour le POC hot-reload de l'IA (et moins coûteux en locking).
     for import in extracted {
-        graph.entry(import).or_insert_with(HashSet::new).insert(filepath.to_string());
+        graph.entry(import).or_default().insert(filepath.to_string());
     }
 }
 
@@ -117,15 +117,13 @@ pub fn start_indexer_and_watcher(base_path: String) {
             .git_ignore(true)
             .build();
             
-        for result in walker {
-            if let Ok(entry) = result {
-                if entry.file_type().map_or(false, |ft| ft.is_file()) {
-                    let path_str = entry.path().to_string_lossy();
-                    if path_str.ends_with(".ts") || path_str.ends_with(".tsx") {
-                        if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                            update_file_in_graph(&path_str, &content);
-                            file_count += 1;
-                        }
+        for entry in walker.flatten() {
+            if entry.file_type().is_some_and(|ft| ft.is_file()) {
+                let path_str = entry.path().to_string_lossy();
+                if path_str.ends_with(".ts") || path_str.ends_with(".tsx") {
+                    if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                        update_file_in_graph(&path_str, &content);
+                        file_count += 1;
                     }
                 }
             }
@@ -162,4 +160,36 @@ pub fn start_indexer_and_watcher(base_path: String) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_imports_simple() {
+        let content = "import { UserAuthRequest } from '@volontariapp/domain-user';";
+        let imports = extract_imports(content);
+        assert_eq!(imports.len(), 2);
+        assert!(imports.contains(&"@volontariapp/domain-user".to_string()));
+        assert!(imports.contains(&"UserAuthRequest".to_string()));
+    }
+
+    #[test]
+    fn test_extract_imports_multiple() {
+        let content = "import { A, B as C, D } from 'module';";
+        let imports = extract_imports(content);
+        assert!(imports.contains(&"module".to_string()));
+        assert!(imports.contains(&"A".to_string()));
+        assert!(imports.contains(&"B".to_string()));
+        assert!(imports.contains(&"D".to_string()));
+    }
+
+    #[test]
+    fn test_extract_imports_default() {
+        let content = "import DefaultExport from './local-module';";
+        let imports = extract_imports(content);
+        assert!(imports.contains(&"./local-module".to_string()));
+        assert!(imports.contains(&"DefaultExport".to_string()));
+    }
 }

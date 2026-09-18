@@ -114,3 +114,26 @@ pub fn parse_file_context(filepath: &str, target_line_1_indexed: usize) -> Resul
         target_block: minified_block,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_minify_rtk_style() {
+        let raw_code = "
+function test() {
+    // This is a normal comment that should be removed
+    
+    /// This is a rustdoc comment that must be kept
+    let a = 1;
+
+    
+    let b = 2;
+}
+";
+        let expected = "\nfunction test() {\n\n/// This is a rustdoc comment that must be kept\nlet a = 1;\n\nlet b = 2;\n}\n";
+        let minified = minify_rtk_style(raw_code);
+        assert_eq!(minified, expected);
+    }
+}

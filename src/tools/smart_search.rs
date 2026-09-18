@@ -79,9 +79,8 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
                         }
                         final_result.push_str("\n--- Contexte Sémantique (Minifié RTK) ---\n");
                         final_result.push_str(&context.target_block);
-                        final_result.push_str("\n");
-                    } else {
-                        // Fallback
+                        final_result.push('\n');
+                    } else {  // Fallback
                         final_result.push_str(parts.get(2).unwrap_or(&""));
                     }
                 } else {
@@ -103,4 +102,20 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
             text: final_result,
         }],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_tool_definition() {
+        let tool = get_tool_definition();
+        assert_eq!(tool.name, "smart_search");
+        assert!(tool.description.contains("ripgrep optimisé"));
+        
+        let schema = tool.input_schema;
+        assert_eq!(schema["type"], "object");
+        assert_eq!(schema["required"][0], "query");
+    }
 }
