@@ -1,0 +1,13 @@
+[package]
+name = "mcp-meta-indexer"
+version = "0.1.0"
+edition = "2021"
+description = "Serveur MCP Hybride pour l'indexation de la codebase Volontariapp"
+
+[dependencies]
+tokio = { version = "1.37", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+futures-util = "0.3"
