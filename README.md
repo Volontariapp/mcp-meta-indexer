@@ -11,14 +11,14 @@ Le serveur est conçu avec une architecture hybride qui lui permet de fonctionne
 
 ```mermaid
 graph TD
-    A[Agent IA / Claude] -->|Transport| B{Environnement}
+    A["Agent IA / Claude"] -->|Transport| B{"Environnement"}
     
-    B -->|Local (Stdio)| C[Processus binaire Rust]
-    C -->|Accès direct| D[Monorepo Local]
+    B -->|"Local (Stdio)"| C["Processus binaire Rust"]
+    C -->|"Accès direct"| D["Monorepo Local"]
     
-    B -->|Distant (SSE)| E[Cluster K8s / Tailscale]
-    E -->|Requêtes HTTP/SSE| F[Pod mcp-meta-indexer]
-    F -->|Accès| G[Volume Code / Git Sync]
+    B -->|"Distant (SSE)"| E["Cluster K8s / Tailscale"]
+    E -->|"Requêtes HTTP/SSE"| F["Pod mcp-meta-indexer"]
+    F -->|Accès| G["Volume Code / Git Sync"]
     
     style C fill:#f9f,stroke:#333,stroke-width:2px
     style F fill:#bbf,stroke:#333,stroke-width:2px
