@@ -1,7 +1,6 @@
-# Étape 1 : Builder
 FROM rust:1.77-alpine as builder
 
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache musl-dev gcc g++ make
 WORKDIR /usr/src/mcp-meta-indexer
 
 COPY Cargo.toml Cargo.lock* ./

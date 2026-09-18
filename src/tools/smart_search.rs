@@ -26,33 +26,75 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
         .and_then(|v| v.as_str())
         .unwrap_or(".");
 
-    // Execution de ripgrep dans le monorepo (ou le dossier spécifié)
-    // On utilise un max de colonnes pour tronquer les très longues lignes compilées
+    let base_path = format!("../{}", directory);
+    
+    // On demande à rg de renvoyer filepath:line_number:content
     let output = Command::new("rg")
         .arg(query)
         .arg("--line-number")
         .arg("--max-columns=150")
-        .current_dir(format!("../{}", directory))
+        .arg("--color=never")
+        .current_dir(&base_path)
         .output()
         .map_err(|e| format!("Erreur lors de l'exécution de ripgrep: {}", e))?;
 
-    let mut result_text = String::from_utf8_lossy(&output.stdout).to_string();
-    
-    if result_text.trim().is_empty() {
-        result_text = "Aucun résultat trouvé.".to_string();
-    } else {
-        // Tronquer le résultat s'il est trop long pour éviter d'exploser le contexte
-        // RTK optimisera déjà cela, mais c'est une sécurité.
-        if result_text.len() > 15000 {
-            result_text.truncate(15000);
-            result_text.push_str("\n... (résultats tronqués pour économiser les tokens)");
+    let rg_output = String::from_utf8_lossy(&output.stdout);
+    if rg_output.trim().is_empty() {
+        return Ok(CallToolResult {
+            content: vec![ToolContent {
+                content_type: "text".to_string(),
+                text: "Aucun résultat trouvé.".to_string(),
+            }],
+        });
+    }
+
+    let mut final_result = String::new();
+    let mut files_processed = std::collections::HashSet::new();
+
+    for line in rg_output.lines().take(20) { // Limiter aux 20 premiers matchs pour la perfs
+        let parts: Vec<&str> = line.splitn(3, ':').collect();
+        if parts.len() >= 2 {
+            let filepath = parts[0];
+            let line_number_str = parts[1];
+            
+            if let Ok(line_num) = line_number_str.parse::<usize>() {
+                if !files_processed.insert(filepath.to_string()) {
+                    continue; // On ne parse le fichier qu'une fois même s'il y a plusieurs matchs
+                }
+
+                let full_path = format!("{}/{}", base_path, filepath);
+                
+                final_result.push_str(&format!("\n=== Fichier: {} ===\n", filepath));
+                
+                // Si c'est du TypeScript, on utilise l'AST
+                if filepath.ends_with(".ts") || filepath.ends_with(".tsx") {
+                    if let Ok(context) = crate::tools::ast_parser::parse_file_context(&full_path, line_num) {
+                        final_result.push_str("--- Imports (Contrats & Dépendances) ---\n");
+                        final_result.push_str(&context.imports);
+                        final_result.push_str("\n--- Contexte Sémantique ---\n");
+                        final_result.push_str(&context.target_block);
+                        final_result.push_str("\n");
+                    } else {
+                        // Fallback
+                        final_result.push_str(parts.get(2).unwrap_or(&""));
+                    }
+                } else {
+                    // Fallback texte classique
+                    final_result.push_str(parts.get(2).unwrap_or(&""));
+                }
+            }
         }
+    }
+
+    if final_result.len() > 20000 {
+        final_result.truncate(20000);
+        final_result.push_str("\n... (résultats tronqués)");
     }
 
     Ok(CallToolResult {
         content: vec![ToolContent {
             content_type: "text".to_string(),
-            text: result_text,
+            text: final_result,
         }],
     })
 }
