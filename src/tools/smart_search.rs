@@ -10,9 +10,12 @@ pub fn get_tool_definition() -> Tool {
             "type": "object",
             "properties": {
                 "query": { "type": "string", "description": "Texte ou regex à rechercher" },
-                "directory": { "type": "string", "description": "Dossier cible optionnel (ex: 'ms-social' ou 'npm-packages')" }
+                "scope": {
+                    "type": "string",
+                    "description": "Chemin absolu vers le repo ou dossier cible (OBLIGATOIRE). Ex: '/code/submodules/ms-social' ou '/code' pour tout le workspace."
+                }
             },
-            "required": ["query"]
+            "required": ["query", "scope"]
         }),
     }
 }
@@ -22,11 +25,18 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
         .and_then(|v| v.as_str())
         .ok_or("Le paramètre 'query' est requis")?;
 
-    let directory = arguments.get("directory")
+    // `scope` est le nom canonique ; on garde `directory` en backward compat
+    let scope = arguments.get("scope")
+        .or_else(|| arguments.get("directory"))
         .and_then(|v| v.as_str())
         .unwrap_or(".");
 
-    let base_path = format!("../{}", directory);
+    // Chemin absolu → utilisation directe ; chemin relatif → relatif au repo parent
+    let base_path = if scope.starts_with('/') {
+        scope.to_string()
+    } else {
+        format!("../{}", scope)
+    };
     
     // On demande à rg de renvoyer filepath:line_number:content
     let output = Command::new("rg")
@@ -89,6 +99,10 @@ pub fn execute(arguments: Value) -> Result<CallToolResult, String> {
                         final_result.push_str("\n--- Contexte Sémantique (Minifié RTK) ---\n");
                         final_result.push_str(&context.target_block);
                         final_result.push('\n');
+                        if !context.skeleton.is_empty() {
+                            final_result.push_str("\n--- Squelette du Fichier ---\n");
+                            final_result.push_str(&context.skeleton);
+                        }
                     } else {  // Fallback
                         final_result.push_str(parts.get(2).unwrap_or(&""));
                     }
@@ -122,9 +136,11 @@ mod tests {
         let tool = get_tool_definition();
         assert_eq!(tool.name, "smart_search");
         assert!(tool.description.contains("ripgrep optimisé"));
-        
+
         let schema = tool.input_schema;
         assert_eq!(schema["type"], "object");
-        assert_eq!(schema["required"][0], "query");
+        // scope est désormais obligatoire
+        let required = schema["required"].as_array().unwrap();
+        assert!(required.iter().any(|v| v == "scope"), "scope doit être required");
     }
 }
