@@ -11,12 +11,37 @@ use std::io::{self, BufRead, Write};
 use mcp_protocol::{JsonRpcRequest, JsonRpcResponse, JsonRpcError};
 use tower_http::cors::CorsLayer;
 
+fn detect_workspace_root() -> String {
+    if let Ok(root) = env::var("CODE_ROOT") {
+        return root;
+    }
+    if let Ok(root) = env::var("WORKSPACE_ROOT") {
+        return root;
+    }
+    if std::path::Path::new("/code").exists() {
+        return "/code".to_string();
+    }
+    if std::path::Path::new("./npm-packages").exists() {
+        return ".".to_string();
+    }
+    if std::path::Path::new("../npm-packages").exists() {
+        return "..".to_string();
+    }
+    ".".to_string()
+}
+
 #[tokio::main]
 async fn main() {
+    let root = detect_workspace_root();
+    let root_dep = root.clone();
+    let root_impact = root.clone();
+
     // Lancement de l'indexation et du file watcher en arrière-plan
-    // Le dossier ".." pointe sur le monorepo (meta) car le serveur est exécuté depuis mcp-meta-indexer
-    std::thread::spawn(|| {
-        tools::dependency_graph::start_indexer_and_watcher("../".to_string());
+    std::thread::spawn(move || {
+        tools::dependency_graph::start_indexer_and_watcher(root_dep);
+    });
+    std::thread::spawn(move || {
+        tools::impact_graph::start_indexer_and_watcher(root_impact);
     });
 
     let transport = env::var("MCP_TRANSPORT").unwrap_or_else(|_| "stdio".to_string());
@@ -102,7 +127,8 @@ async fn handle_request(req: JsonRpcRequest) -> JsonRpcResponse {
         "tools/list" => {
             let tool1 = tools::smart_search::get_tool_definition();
             let tool2 = tools::dependency_graph::get_tool_definition();
-            Ok(json!({ "tools": [tool1, tool2] }))
+            let tool3 = tools::impact_graph::get_tool_definition();
+            Ok(json!({ "tools": [tool1, tool2, tool3] }))
         }
         "tools/call" => {
             let name = req.params.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -115,6 +141,11 @@ async fn handle_request(req: JsonRpcRequest) -> JsonRpcResponse {
                 }
             } else if name == "find_dependents" {
                 match tools::dependency_graph::execute(args) {
+                    Ok(res) => Ok(serde_json::to_value(res).unwrap()),
+                    Err(e) => Err(JsonRpcError { code: -32603, message: e }),
+                }
+            } else if name == "analyze_impact" {
+                match tools::impact_graph::execute(args) {
                     Ok(res) => Ok(serde_json::to_value(res).unwrap()),
                     Err(e) => Err(JsonRpcError { code: -32603, message: e }),
                 }
