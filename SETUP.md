@@ -20,7 +20,7 @@ cargo build --release
 
 Pour que l'agent IA détecte et utilise ce serveur, il faut le déclarer dans le fichier de configuration MCP de ton workspace (ou au niveau global).
 
-Dans le répertoire racine de ton projet (ex: `.agents/mcp_config.json`), ajoute la configuration suivante :
+Dans le répertoire racine de ton projet (ex: `.agents/mcp_config.json`), ajoute la configuration suivante. Tu as le choix entre le mode **Local** (si tu as le code et Rust sur ta machine) ou le mode **Cloud/Distant** (qui s'exécute directement sur le cluster Kubernetes) :
 
 ```json
 {
@@ -31,10 +31,19 @@ Dans le répertoire racine de ton projet (ex: `.agents/mcp_config.json`), ajoute
       "env": {
         "MCP_TRANSPORT": "stdio"
       }
+    },
+    "meta-indexer-cluster": {
+      "command": "kubectl",
+      "args": [
+        "exec", "-i", "deployment/mcp-meta-indexer", "-n", "prod", 
+        "-c", "mcp-meta-indexer", "--", "env", "MCP_TRANSPORT=stdio", "mcp-meta-indexer"
+      ]
     }
   }
 }
 ```
+
+> **Note :** Tu n'es pas obligé de garder les deux. Garde `meta-indexer-local` si tu veux que l'agent lise ton code local via `cargo`, ou `meta-indexer-cluster` si tu veux qu'il s'interface avec le Pod Kubernetes sans rien faire tourner sur ton processeur.
 
 ## 4. Règle de comportement (Recommandé)
 
