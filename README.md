@@ -1,6 +1,6 @@
 # mcp-meta-indexer
 
-Serveur MCP (Model Context Protocol) haute performance écrit en **Rust**, conçu pour indexer, naviguer et cartographier instantanément la codebase distribuée de Volontariapp (17 microservices et packages).
+Serveur MCP (Model Context Protocol) haute performance écrit en **Rust**, conçu pour indexer, naviguer et cartographier instantanément la codebase distribuée de Volontariapp (5 microservices et packages).
 
 Il expose trois capacités majeures :
 1. 🔍 **`smart_search`** : Recherche plein texte couplée à un parser **Tree-sitter (AST)** pour extraire le bloc cible et générer le **squelette architectural** du fichier (~90% d'économie de tokens).
@@ -109,7 +109,7 @@ graph LR
 
 ### Graphe des Flux Asynchrones CQRS & Impact Graph (`analyze_impact`) 🚀
 
-> **La "dinguerie" d'ingénierie :** Dans un monorepo distribué de 17 microservices utilisant le pattern **Transactional Outbox**, **Redis Streams**, **BullMQ**, des **Post-Processors** et des **Sagas chorégraphiées**, la causalité du code n'est plus linéaire. 
+> **La "dinguerie" d'ingénierie :** Dans un monorepo distribué de 5 microservices utilisant le pattern **Transactional Outbox**, **Redis Streams**, **BullMQ**, des **Post-Processors** et des **Sagas chorégraphiées**, la causalité du code n'est plus linéaire. 
 > `analyze_impact` résout en mémoire vive l'intégralité de la chaîne événementielle en **< 2ms**, réduisant drastiquement le coût en tokens pour les agents IA et le temps d'exploration cognitive pour les développeurs.
 
 #### 1. Le Problème Architectural Résolu
