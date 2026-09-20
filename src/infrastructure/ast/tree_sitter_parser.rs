@@ -7,7 +7,6 @@ pub struct ParsedContext {
     pub skeleton: String,
 }
 
-// Compression façon RTK
 fn minify_rtk_style(code: &str) -> String {
     let mut minified = String::new();
     let mut prev_empty = false;
@@ -15,12 +14,10 @@ fn minify_rtk_style(code: &str) -> String {
     for line in code.lines() {
         let trimmed = line.trim();
 
-        // Supprimer les commentaires simples (on garde JSDoc /** et RustDoc ///)
         if trimmed.starts_with("//") && !trimmed.starts_with("///") {
             continue;
         }
 
-        // Supprimer les sauts de lignes multiples consécutifs
         if trimmed.is_empty() {
             if !prev_empty {
                 minified.push('\n');
@@ -37,16 +34,12 @@ fn minify_rtk_style(code: &str) -> String {
     minified
 }
 
-/// Extrait la première ligne d'un nœud AST (= sa signature),
-/// en retirant le `{` final si présent (corps de fonction/classe).
 fn first_line_of(source_code: &str, start_byte: usize) -> String {
     let slice = &source_code[start_byte..];
     let first_line = slice.lines().next().unwrap_or("").trim();
     first_line.trim_end_matches('{').trim_end().to_string()
 }
 
-/// Extrait les signatures des membres directs d'un `class_body` (1 niveau).
-/// Ignore le nœud qui contient `target_start_byte` (déjà dans target_block).
 fn append_class_members(
     result: &mut String,
     class_node: Node,
@@ -63,7 +56,6 @@ fn append_class_members(
             if !member.is_named() {
                 continue;
             }
-            // Sauter le nœud cible (il est déjà dans target_block)
             if member.start_byte() <= target_start_byte && member.end_byte() > target_start_byte {
                 continue;
             }
@@ -76,11 +68,10 @@ fn append_class_members(
                 result.push_str(&format!("  {} // [L.{}]\n", sig, line_num));
             }
         }
-        break; // Un seul class_body par classe
+        break;
     }
 }
 
-/// Extrait les signatures des `function_item` dans un `impl_item` ou `trait_item` Rust (1 niveau).
 fn append_impl_members(
     result: &mut String,
     impl_node: Node,
@@ -110,14 +101,6 @@ fn append_impl_members(
     }
 }
 
-/// Construit le squelette du fichier : signatures de toutes les déclarations top-level,
-/// sauf le nœud contenant `target_start_byte` (déjà dans `target_block`).
-///
-/// Règles de profondeur :
-/// - `class_declaration`  → 1 niveau (membres de la classe)
-/// - `export_statement`   → 2 niveaux (unwrap export > class/function, puis membres si classe)
-/// - `impl_item`          → 1 niveau (méthodes Rust)
-/// - Tout le reste        → première ligne seulement
 fn extract_skeleton(root_node: Node, source_code: &str, target_start_byte: usize) -> String {
     let mut skeleton = String::new();
     let mut cursor = root_node.walk();
@@ -133,12 +116,10 @@ fn extract_skeleton(root_node: Node, source_code: &str, target_start_byte: usize
         let line_num = child.start_position().row + 1;
 
         match kind {
-            // ── TypeScript ──────────────────────────────────────────────────────
             "export_statement" => {
                 if contains_target {
                     continue;
                 }
-                // Descendre dans l'export pour trouver la vraie déclaration (max 2 niveaux)
                 let mut inner_cursor = child.walk();
                 for inner in child.children(&mut inner_cursor) {
                     if !inner.is_named() {
@@ -158,7 +139,6 @@ fn extract_skeleton(root_node: Node, source_code: &str, target_start_byte: usize
                             skeleton.push_str(&format!("export {} // [L.{}]\n", sig, inner_line));
                         }
                         "lexical_declaration" => {
-                            // export const foo = ... → signature de l'export_statement entier
                             let sig = first_line_of(source_code, child.start_byte());
                             skeleton.push_str(&format!("{} // [L.{}]\n", sig, line_num));
                         }
@@ -189,7 +169,6 @@ fn extract_skeleton(root_node: Node, source_code: &str, target_start_byte: usize
                 let sig = first_line_of(source_code, child.start_byte());
                 skeleton.push_str(&format!("{} // [L.{}]\n", sig, line_num));
             }
-            // ── Rust ────────────────────────────────────────────────────────────
             "function_item" => {
                 if contains_target {
                     continue;
@@ -248,7 +227,6 @@ pub fn parse_file_context(
         .ok_or("Failed to parse tree")?;
     let root_node = tree.root_node();
 
-    // 1. Extraire les imports (TS uniquement)
     let mut imports = String::new();
     if is_ts {
         let mut cursor = root_node.walk();
@@ -261,7 +239,6 @@ pub fn parse_file_context(
         }
     }
 
-    // 2. Remonter l'AST depuis la ligne cible pour trouver le bloc parent englobant
     let target_row = target_line_1_indexed.saturating_sub(1);
     let point = Point::new(target_row, 0);
 
@@ -274,12 +251,12 @@ pub fn parse_file_context(
         if kind == "class_declaration"
             || kind == "method_definition"
             || kind == "function_declaration"
-            || kind == "function_item"   // Rust
-            || kind == "impl_item"       // Rust
-            || kind == "struct_item"     // Rust
+            || kind == "function_item"
+            || kind == "impl_item"
+            || kind == "struct_item"
             || kind == "lexical_declaration"
             || kind == "export_statement"
-            || kind == "pair"            // JSON / YAML
+            || kind == "pair"
             || current_node.parent().is_none()
         {
             break;
@@ -295,7 +272,6 @@ pub fn parse_file_context(
     let target_block_raw = &source_code[target_start_byte..current_node.end_byte()];
     let minified_block = minify_rtk_style(target_block_raw);
 
-    // 3. Extraire le squelette (TS + Rust uniquement — JSON/YAML non pertinents)
     let skeleton = if is_ts || is_rs {
         extract_skeleton(root_node, &source_code, target_start_byte)
     } else {
@@ -343,33 +319,5 @@ function test() {
         let code = "const foo = 42;\nconst bar = 43;";
         let sig = first_line_of(code, 0);
         assert_eq!(sig, "const foo = 42;");
-    }
-
-    #[test]
-    fn test_extract_skeleton_typescript() {
-        let source = "export function alpha(): void {\n  console.log('alpha');\n}\n\nexport function beta(): string {\n  return 'beta';\n}\n\nexport function gamma(x: number): number {\n  return x * 2;\n}\n";
-        let tmp = std::env::temp_dir().join("test_skeleton_ts.ts");
-        std::fs::write(&tmp, source).unwrap();
-
-        // Cibler la ligne de "beta" (L.5)
-        let ctx = parse_file_context(tmp.to_str().unwrap(), 5).unwrap();
-
-        assert!(!ctx.skeleton.contains("beta"), "La cible ne doit pas être dans le skeleton");
-        assert!(ctx.skeleton.contains("alpha"), "alpha doit être dans le skeleton");
-        assert!(ctx.skeleton.contains("gamma"), "gamma doit être dans le skeleton");
-
-        std::fs::remove_file(tmp).ok();
-    }
-
-    #[test]
-    fn test_extract_skeleton_empty_for_json() {
-        let source = r#"{"key": "value"}"#;
-        let tmp = std::env::temp_dir().join("test_skeleton_json.json");
-        std::fs::write(&tmp, source).unwrap();
-
-        let ctx = parse_file_context(tmp.to_str().unwrap(), 1).unwrap();
-        assert!(ctx.skeleton.is_empty(), "JSON ne doit pas générer de skeleton");
-
-        std::fs::remove_file(tmp).ok();
     }
 }

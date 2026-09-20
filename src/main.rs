@@ -1,15 +1,23 @@
+mod domain;
+mod engine;
+mod infrastructure;
 mod mcp_protocol;
 mod tools;
 
-use axum::{
-    routing::{get, post},
-    Router, Json,
-};
-use serde_json::{json, Value};
 use std::env;
 use std::io::{self, BufRead, Write};
-use mcp_protocol::{JsonRpcRequest, JsonRpcResponse, JsonRpcError};
+use std::sync::Arc;
+use axum::{
+    routing::{get, post},
+    Extension, Json, Router,
+};
+use serde_json::{json, Value};
 use tower_http::cors::CorsLayer;
+
+use engine::dependency_engine::index_dependencies;
+use engine::state::AppState;
+use infrastructure::watcher::start_workspace_watcher;
+use mcp_protocol::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 
 fn detect_workspace_root() -> String {
     if let Ok(root) = env::var("CODE_ROOT") {
@@ -33,15 +41,23 @@ fn detect_workspace_root() -> String {
 #[tokio::main]
 async fn main() {
     let root = detect_workspace_root();
-    let root_dep = root.clone();
-    let root_impact = root.clone();
+    eprintln!("🚀 Initialisation de mcp-meta-indexer sur la racine : '{}'", root);
 
-    // Lancement de l'indexation et du file watcher en arrière-plan
+    let state = Arc::new(AppState::new(root.clone()));
+
+    // 1. Indexation asynchrone des dépendances au démarrage
+    let state_deps = Arc::clone(&state);
+    let root_deps = root.clone();
     std::thread::spawn(move || {
-        tools::dependency_graph::start_indexer_and_watcher(root_dep);
+        index_dependencies(&state_deps, &root_deps);
+        eprintln!("✅ Graphe de dépendances indexé en RAM.");
     });
+
+    // 2. File watcher unifié
+    let state_watcher = Arc::clone(&state);
+    let root_watcher = root.clone();
     std::thread::spawn(move || {
-        tools::impact_graph::start_indexer_and_watcher(root_impact);
+        start_workspace_watcher(root_watcher, state_watcher);
     });
 
     let transport = env::var("MCP_TRANSPORT").unwrap_or_else(|_| "stdio".to_string());
@@ -51,6 +67,7 @@ async fn main() {
         let app = Router::new()
             .route("/sse", get(sse_handler))
             .route("/messages", post(messages_handler))
+            .layer(Extension(state))
             .layer(CorsLayer::permissive());
 
         let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -74,18 +91,16 @@ async fn main() {
 
             match serde_json::from_str::<Value>(trimmed) {
                 Ok(raw) => {
-                    // Les notifications n'ont pas de "id" — on les traite sans répondre
                     let has_id = raw.get("id").is_some();
                     let method = raw.get("method").and_then(|m| m.as_str()).unwrap_or("");
 
-                    // Notifications (pas de réponse attendue)
                     if !has_id && method.starts_with("notifications/") {
                         continue;
                     }
 
                     match serde_json::from_value::<JsonRpcRequest>(raw) {
                         Ok(request) => {
-                            let response = handle_request(request).await;
+                            let response = handle_request(&state, request).await;
                             let response_json = serde_json::to_string(&response).unwrap();
                             println!("{}", response_json);
                             io::stdout().flush().unwrap();
@@ -103,13 +118,15 @@ async fn main() {
     }
 }
 
-async fn handle_request(req: JsonRpcRequest) -> JsonRpcResponse {
+async fn handle_request(state: &Arc<AppState>, req: JsonRpcRequest) -> JsonRpcResponse {
     let result = match req.method.as_str() {
         "initialize" => {
-            let protocol_version = req.params.get("protocolVersion")
+            let protocol_version = req
+                .params
+                .get("protocolVersion")
                 .and_then(|v| v.as_str())
                 .unwrap_or("2026-09-11");
-                
+
             Ok(json!({
                 "protocolVersion": protocol_version,
                 "capabilities": {
@@ -117,43 +134,56 @@ async fn handle_request(req: JsonRpcRequest) -> JsonRpcResponse {
                 },
                 "serverInfo": {
                     "name": "mcp-meta-indexer",
-                    "version": "0.1.0"
+                    "version": "0.2.0"
                 }
             }))
         }
         "notifications/initialized" => {
-            Ok(json!({})) // Simple ack for the notification
+            Ok(json!({}))
         }
         "tools/list" => {
             let tool1 = tools::smart_search::get_tool_definition();
-            let tool2 = tools::dependency_graph::get_tool_definition();
-            let tool3 = tools::impact_graph::get_tool_definition();
-            Ok(json!({ "tools": [tool1, tool2, tool3] }))
+            let tool2 = tools::find_dependents::get_tool_definition();
+            let tool3 = tools::analyze_impact::get_tool_definition();
+            let tool4 = tools::analyze_grpc::get_tool_definition();
+            let tool5 = tools::search_docs::get_tool_definition();
+            Ok(json!({ "tools": [tool1, tool2, tool3, tool4, tool5] }))
         }
         "tools/call" => {
             let name = req.params.get("name").and_then(|v| v.as_str()).unwrap_or("");
             let args = req.params.get("arguments").cloned().unwrap_or(json!({}));
-            
-            if name == "smart_search" {
-                match tools::smart_search::execute(args) {
+
+            match name {
+                "smart_search" => match tools::smart_search::execute(state, args) {
                     Ok(res) => Ok(serde_json::to_value(res).unwrap()),
                     Err(e) => Err(JsonRpcError { code: -32603, message: e }),
-                }
-            } else if name == "find_dependents" {
-                match tools::dependency_graph::execute(args) {
+                },
+                "find_dependents" => match tools::find_dependents::execute(state, args) {
                     Ok(res) => Ok(serde_json::to_value(res).unwrap()),
                     Err(e) => Err(JsonRpcError { code: -32603, message: e }),
-                }
-            } else if name == "analyze_impact" {
-                match tools::impact_graph::execute(args) {
+                },
+                "analyze_impact" => match tools::analyze_impact::execute(state, args) {
                     Ok(res) => Ok(serde_json::to_value(res).unwrap()),
                     Err(e) => Err(JsonRpcError { code: -32603, message: e }),
-                }
-            } else {
-                Err(JsonRpcError { code: -32601, message: "Outil inconnu".to_string() })
+                },
+                "analyze_grpc" => match tools::analyze_grpc::execute(state, args) {
+                    Ok(res) => Ok(serde_json::to_value(res).unwrap()),
+                    Err(e) => Err(JsonRpcError { code: -32603, message: e }),
+                },
+                "search_docs" => match tools::search_docs::execute(state, args) {
+                    Ok(res) => Ok(serde_json::to_value(res).unwrap()),
+                    Err(e) => Err(JsonRpcError { code: -32603, message: e }),
+                },
+                _ => Err(JsonRpcError {
+                    code: -32601,
+                    message: format!("Outil inconnu: '{}'", name),
+                }),
             }
         }
-        _ => Err(JsonRpcError { code: -32601, message: "Méthode non supportée".to_string() }),
+        _ => Err(JsonRpcError {
+            code: -32601,
+            message: "Méthode non supportée".to_string(),
+        }),
     };
 
     match result {
@@ -172,12 +202,14 @@ async fn handle_request(req: JsonRpcRequest) -> JsonRpcResponse {
     }
 }
 
-// Handlers HTTP fictifs pour SSE (à compléter pour un vrai stream SSE)
 async fn sse_handler() -> &'static str {
-    "Endpoint SSE - En attente d'implémentation complète des events"
+    "Endpoint SSE - mcp-meta-indexer v0.2.0"
 }
 
-async fn messages_handler(Json(payload): Json<JsonRpcRequest>) -> Json<JsonRpcResponse> {
-    let response = handle_request(payload).await;
+async fn messages_handler(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(payload): Json<JsonRpcRequest>,
+) -> Json<JsonRpcResponse> {
+    let response = handle_request(&state, payload).await;
     Json(response)
 }

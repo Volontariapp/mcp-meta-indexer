@@ -2,10 +2,12 @@
 
 Serveur MCP (Model Context Protocol) haute performance écrit en **Rust**, conçu pour indexer, naviguer et cartographier instantanément la codebase distribuée de Volontariapp (5 microservices et packages).
 
-Il expose trois capacités majeures :
-1. 🔍 **`smart_search`** : Recherche plein texte couplée à un parser **Tree-sitter (AST)** pour extraire le bloc cible et générer le **squelette architectural** du fichier (~90% d'économie de tokens).
+Il expose cinq capacités majeures :
+1. 🔍 **`smart_search`** : Recherche plein texte couplée à un parser **Tree-sitter (AST)** pour extraire le bloc cible et générer le **squelette architectural** (~90% d'économie de tokens), avec **fallback Fuzzy Matching** (Skim/Clangd) en cas de faute de frappe.
 2. 🕸️ **`find_dependents`** : Graphe des imports et dépendances en mémoire vive (résolution $O(1)$ des contrats et packages partagés).
 3. ⚡ **`analyze_impact`** : **Cartographie causale de l'architecture événementielle (CQRS / Sagas / Outbox)**. Résout en $< 2\text{ms}$ les flux d'événements 1:N, les jobs 1:1, les post-processors, les compensations de sagas et les broadcasts WebSocket.
+4. 🌐 **`analyze_grpc`** : **Cartographie synchrone des flux gRPC** de bout en bout (définition `.proto` dans `proto-registry`, injection client dans l'API Gateway/MS, et controllers microservices avec `@GrpcMethod`).
+5. 📚 **`search_docs`** : **Recherche ciblée dans la documentation C4** (`meta/docs/`), extrayant directement les sections conceptuelles pertinentes en ~200 tokens.
 
 ## Architecture & Fonctionnement
 
