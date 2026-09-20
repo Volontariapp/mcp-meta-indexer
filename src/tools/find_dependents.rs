@@ -32,6 +32,20 @@ pub fn execute(state: &Arc<AppState>, arguments: Value) -> Result<CallToolResult
         for file in files {
             text.push_str(&format!("- {}\n", file));
         }
+
+        if target.starts_with("@volontariapp")
+            || target.contains("domain-")
+            || target.contains("messaging")
+            || target.contains("contracts")
+        {
+            text.push_str("\n════════════════════════════════════════════════════════════════════════════════\n");
+            text.push_str("💡 GUIDANCE OPÉRATIONNELLE :\n");
+            text.push_str("📦 Pour modifier ce package partagé : Skill `.agents/skills/global/shared-npm-package-change/SKILL.md`\n");
+            text.push_str("🛑 RÈGLE DU STOP IMMÉDIAT : Après `yarn build` et `yarn changeset add`, STOP TOTAL !\n");
+            text.push_str("   Interdiction formelle d'éditer les microservices consommateurs avant publication par la CI.\n");
+            text.push_str("════════════════════════════════════════════════════════════════════════════════\n");
+        }
+
         text
     } else {
         format!("Aucune dépendance trouvée pour '{}' dans le graphe en mémoire.", target)

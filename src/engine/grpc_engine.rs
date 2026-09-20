@@ -109,5 +109,14 @@ pub fn query_grpc(graph: &GrpcFlowGraph, target: &str) -> String {
         out.push('\n');
     }
 
+    out.push_str("════════════════════════════════════════════════════════════════════════════════\n");
+    out.push_str("💡 GUIDANCE OPÉRATIONNELLE :\n");
+    out.push_str("🌐 Pour faire évoluer ce contrat Protobuf/gRPC : Skill `.agents/skills/global/proto-contract-evolution/SKILL.md`\n");
+    out.push_str("🛑 RÈGLE BLOQUANTE (CASCADE CI) :\n");
+    out.push_str("   1. Modifie le `.proto` dans `proto-registry` et valide `buf lint`.\n");
+    out.push_str("   2. STOP IMMÉDIAT : La CI de proto-registry ouvre automatiquement une PR dans `npm-packages`.\n");
+    out.push_str("   3. Attends que la PR soit mergée et que `@volontariapp/contracts` soit publié par la CI avant de modifier les microservices !\n");
+    out.push_str("════════════════════════════════════════════════════════════════════════════════\n");
+
     out
 }

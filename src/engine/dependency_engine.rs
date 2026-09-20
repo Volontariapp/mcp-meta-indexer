@@ -6,16 +6,30 @@ use crate::engine::state::AppState;
 
 pub fn extract_imports(content: &str) -> Vec<String> {
     let mut imports = Vec::new();
-    let re = Regex::new(r#"(?m)^import\s+(?:\{([^}]+)\}|([a-zA-Z0-9_*]+))\s+from\s+['"]([^'"]+)['"]"#).unwrap();
+    let re = Regex::new(
+        r#"(?s)import\s+(?:type\s+)?(?:\{([^}]+)\}|([a-zA-Z0-9_*]+))\s+from\s+['"]([^'"]+)['"]"#,
+    )
+    .unwrap();
 
     for cap in re.captures_iter(content) {
         if let Some(pkg) = cap.get(3) {
-            imports.push(pkg.as_str().to_string());
+            let pkg_str = pkg.as_str().to_string();
+            imports.push(pkg_str.clone());
+            // Si c'est un sous-chemin comme @volontariapp/messaging/jobs, indexer aussi le package racine
+            if let Some(idx) = pkg_str.rfind('/') {
+                if pkg_str.starts_with('@') && pkg_str[idx..].contains('/') {
+                    // ex: @scope/pkg/sub -> @scope/pkg
+                    let parts: Vec<&str> = pkg_str.split('/').collect();
+                    if parts.len() > 2 {
+                        imports.push(format!("{}/{}", parts[0], parts[1]));
+                    }
+                }
+            }
         }
 
         if let Some(symbols_block) = cap.get(1) {
             for symbol in symbols_block.as_str().split(',') {
-                let s = symbol.trim();
+                let s = symbol.trim().trim_start_matches("type ").trim();
                 if !s.is_empty() {
                     let parts: Vec<&str> = s.split(" as ").collect();
                     imports.push(parts[0].trim().to_string());
@@ -69,3 +83,32 @@ pub fn query_dependents(state: &AppState, target: &str) -> Option<Vec<String>> {
         list
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_imports_complex() {
+        let ts_code = r#"
+import { Logger } from '@volontariapp/logger';
+import type { UserAuthRequest, SignUpDTO } from '@volontariapp/contracts';
+import {
+    EventsQueue,
+    type ISyncExternalCalendarPayload,
+} from '@volontariapp/messaging/jobs';
+import * as path from 'path';
+"#;
+        let imports = extract_imports(ts_code);
+        assert!(imports.contains(&"@volontariapp/logger".to_string()));
+        assert!(imports.contains(&"Logger".to_string()));
+        assert!(imports.contains(&"@volontariapp/contracts".to_string()));
+        assert!(imports.contains(&"UserAuthRequest".to_string()));
+        assert!(imports.contains(&"SignUpDTO".to_string()));
+        assert!(imports.contains(&"@volontariapp/messaging/jobs".to_string()));
+        assert!(imports.contains(&"@volontariapp/messaging".to_string()));
+        assert!(imports.contains(&"EventsQueue".to_string()));
+        assert!(imports.contains(&"ISyncExternalCalendarPayload".to_string()));
+    }
+}
+

@@ -6,6 +6,9 @@ pub fn query_impact(graph: &AsyncFlowGraph, target: &str) -> String {
     let target_lower = target.to_lowercase();
     let mut found = false;
 
+    let mut found_event = false;
+    let mut found_job = false;
+
     // 1. Recherche par Événement
     for (key, event) in &graph.events {
         let matches_key = key.to_uppercase().contains(&target_upper);
@@ -13,6 +16,7 @@ pub fn query_impact(graph: &AsyncFlowGraph, target: &str) -> String {
 
         if matches_key || matches_raw {
             found = true;
+            found_event = true;
             out.push_str("================================================================================\n");
             out.push_str(&format!("⚡ ÉVÉNEMENT DISTRIBUÉ : {}\n", key));
             if let Some(raw) = &event.raw_value {
@@ -78,6 +82,7 @@ pub fn query_impact(graph: &AsyncFlowGraph, target: &str) -> String {
 
         if matches_key || matches_raw {
             found = true;
+            found_job = true;
             out.push_str("================================================================================\n");
             out.push_str(&format!("💼 TÂCHE ASYNCHRONE / JOB (BullMQ) : {}\n", key));
             if let Some(raw) = &job.raw_value {
@@ -136,6 +141,21 @@ pub fn query_impact(graph: &AsyncFlowGraph, target: &str) -> String {
             target
         )
     } else {
+        if found_event {
+            out.push_str("════════════════════════════════════════════════════════════════════════════════\n");
+            out.push_str("💡 GUIDANCE OPÉRATIONNELLE :\n");
+            out.push_str("⚡ Pour implémenter ou modifier ce flux : Skill `.agents/skills/global/implement-async-event-flow/SKILL.md`\n");
+            out.push_str("🔍 Pour diagnostiquer un blocage runtime SQL : Skill `.agents/skills/global/trace-async-flow/SKILL.md`\n");
+            out.push_str("🛑 RÈGLE DU STOP : Si tu modifies `messaging` ou `shared`, `yarn changeset add` puis STOP TOTAL ! Attends la publication par la CI.\n");
+            out.push_str("════════════════════════════════════════════════════════════════════════════════\n");
+        } else if found_job {
+            out.push_str("════════════════════════════════════════════════════════════════════════════════\n");
+            out.push_str("💡 GUIDANCE OPÉRATIONNELLE :\n");
+            out.push_str("💼 Pour implémenter ou modifier ce job : Skill `.agents/skills/global/implement-async-job-flow/SKILL.md`\n");
+            out.push_str("🔍 Pour diagnostiquer un blocage runtime SQL : Skill `.agents/skills/global/trace-async-flow/SKILL.md`\n");
+            out.push_str("🛑 RÈGLE DU STOP : Si tu modifies `messaging`, `yarn changeset add` puis STOP TOTAL ! Attends la publication par la CI.\n");
+            out.push_str("════════════════════════════════════════════════════════════════════════════════\n");
+        }
         out
     }
 }

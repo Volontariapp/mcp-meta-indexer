@@ -37,7 +37,7 @@ pub fn execute(state: &Arc<AppState>, arguments: Value) -> Result<CallToolResult
         .unwrap_or(3) as usize;
 
     let index = state.docs.read().unwrap();
-    let result_text = query_docs(&index, query, max_sections);
+    let result_text = query_docs(&index, query, max_sections, &state.root_dir);
 
     Ok(CallToolResult {
         content: vec![ToolContent {
