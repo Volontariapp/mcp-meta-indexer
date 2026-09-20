@@ -322,5 +322,10 @@ mod tests {
         let res = query_docs(&index, "ws scatter gather", 2, "/workspace");
         assert!(res.contains("Scatter-Gather WebSocket"));
         assert!(res.contains("GUIDANCE OPÉRATIONNELLE"));
+
+        // Test fuzzy fallback multi-termes avec fautes de frappe
+        let res_fuzzy = query_docs(&index, "scattr gathr", 2, "/workspace");
+        assert!(res_fuzzy.contains("Suggestions lexicales les plus proches"));
+        assert!(res_fuzzy.contains("Scatter-Gather WebSocket"));
     }
 }
