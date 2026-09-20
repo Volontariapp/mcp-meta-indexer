@@ -114,6 +114,7 @@ Sélectionne la configuration adaptée à ton mode :
         "--",
         "env",
         "MCP_TRANSPORT=stdio",
+        "CODE_ROOT=/code/deploy.git/submodules",
         "mcp-meta-indexer"
       ]
     }

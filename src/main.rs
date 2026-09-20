@@ -26,9 +26,22 @@ fn detect_workspace_root() -> String {
     if let Ok(root) = env::var("WORKSPACE_ROOT") {
         return root;
     }
+
+    // Détection automatique pour le cluster Kubernetes avec sidecar git-sync
+    let k8s_candidates = [
+        "/code/deploy.git/submodules",
+        "/code/submodules",
+        "/code/deploy/submodules",
+    ];
+    for path in k8s_candidates {
+        if std::path::Path::new(&format!("{}/npm-packages", path)).exists() {
+            return path.to_string();
+        }
+    }
     if std::path::Path::new("/code").exists() {
         return "/code".to_string();
     }
+
     if std::path::Path::new("./npm-packages").exists() {
         return ".".to_string();
     }
