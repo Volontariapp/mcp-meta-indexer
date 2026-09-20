@@ -13,7 +13,7 @@ Plutôt que d'obliger l'agent IA à lire des milliers de lignes de code ou à ex
 ```mermaid
 flowchart LR
     Agent["Agent IA\n(Claude / Antigravity)"] <-->|"JSON-RPC 2.0\n(Stdio ou SSE)"| MCP["mcp-meta-indexer\n(Rust)"]
-    MCP <-->|"Index en RAM (O(1))\n+ Tree-sitter AST"| Codebase[("Codebase Volontariapp\n(17 repos)")]
+    MCP <-->|"Index en RAM (O(1))\n+ Tree-sitter AST"| Codebase[("Codebase Volontariapp\n(tout les repos)")]
 ```
 
 Pour comprendre le cycle de vie du protocole et l'architecture interne du serveur en détail, consultez le guide [Vue d'ensemble de l'Architecture](./docs/overview.md).
