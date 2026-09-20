@@ -32,10 +32,10 @@ pub fn query_grpc(graph: &GrpcFlowGraph, target: &str) -> String {
                 let matches_req = m.request_type.to_lowercase().contains(&target_lower);
                 let matches_resp = m.response_type.to_lowercase().contains(&target_lower);
 
-                if matches_name || matches_req || matches_resp {
-                    if !matched_methods.iter().any(|existing| existing.method_name == m.method_name && existing.service_name == m.service_name) {
-                        matched_methods.push(m);
-                    }
+                if (matches_name || matches_req || matches_resp)
+                    && !matched_methods.iter().any(|existing| existing.method_name == m.method_name && existing.service_name == m.service_name)
+                {
+                    matched_methods.push(m);
                 }
             }
         }

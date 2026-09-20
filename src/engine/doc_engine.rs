@@ -31,7 +31,7 @@ pub fn query_docs(index: &DocIndex, query: &str, max_sections: usize) -> String 
         })
         .collect();
 
-    scored_sections.sort_by(|a, b| b.1.cmp(&a.1));
+    scored_sections.sort_by_key(|a| std::cmp::Reverse(a.1));
     scored_sections.truncate(max_sections);
 
     if scored_sections.is_empty() {

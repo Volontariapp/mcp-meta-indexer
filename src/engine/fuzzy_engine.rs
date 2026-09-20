@@ -1,16 +1,9 @@
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 
+#[derive(Default)]
 pub struct FuzzyEngine {
     matcher: SkimMatcherV2,
-}
-
-impl Default for FuzzyEngine {
-    fn default() -> Self {
-        Self {
-            matcher: SkimMatcherV2::default(),
-        }
-    }
 }
 
 impl FuzzyEngine {
@@ -34,7 +27,7 @@ impl FuzzyEngine {
             .collect();
 
         // Trier par score décroissant
-        scored.sort_by(|a, b| b.1.cmp(&a.1));
+        scored.sort_by_key(|a| std::cmp::Reverse(a.1));
         scored.truncate(max_results);
         scored
     }

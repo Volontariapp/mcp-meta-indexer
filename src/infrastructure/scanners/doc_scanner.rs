@@ -8,10 +8,16 @@ pub fn scan_docs(root_dir: &str) -> DocIndex {
     let mut index = DocIndex::default();
     let root_clean = root_dir.trim_end_matches('/');
 
-    let docs_dir = format!("{}/docs", root_clean);
-    if !Path::new(&docs_dir).exists() {
-        return index;
-    }
+    let candidates = [
+        format!("{}/docs", root_clean),
+        format!("{}/submodules/docs", root_clean),
+        format!("{}/../docs", root_clean),
+    ];
+
+    let docs_dir = match candidates.into_iter().find(|d| Path::new(d).exists()) {
+        Some(d) => d,
+        None => return index,
+    };
 
     let walker = WalkBuilder::new(&docs_dir)
         .hidden(false)
