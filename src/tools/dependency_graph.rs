@@ -127,7 +127,8 @@ pub fn start_indexer_and_watcher(base_path: String) {
         
     for entry in walker.flatten() {
         if entry.file_type().is_some_and(|ft| ft.is_file()) {
-            let path_str = entry.path().to_string_lossy();
+            let path = entry.path();
+            let path_str = path.strip_prefix(&base_path).unwrap_or(path).to_string_lossy().into_owned();
             if path_str.ends_with(".ts") || path_str.ends_with(".tsx") {
                 if let Ok(content) = std::fs::read_to_string(entry.path()) {
                     update_file_in_graph(&path_str, &content);
@@ -157,7 +158,7 @@ pub fn start_indexer_and_watcher(base_path: String) {
                 Ok(Event { kind: EventKind::Modify(_), paths, .. }) |
                 Ok(Event { kind: EventKind::Create(_), paths, .. }) => {
                     for path in paths {
-                        let path_str = path.to_string_lossy();
+                        let path_str = path.strip_prefix(&base_path).unwrap_or(&path).to_string_lossy().into_owned();
                         if path_str.ends_with(".ts") || path_str.ends_with(".tsx") {
                             if let Ok(content) = std::fs::read_to_string(&path) {
                                 update_file_in_graph(&path_str, &content);

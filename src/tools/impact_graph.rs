@@ -222,11 +222,11 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
         for result in walker.flatten() {
             if result.file_type().is_some_and(|ft| ft.is_file()) {
                 let path = result.path();
-                let path_str = path.to_string_lossy();
+                let path_str = path.strip_prefix(root_clean).unwrap_or(path).to_string_lossy().into_owned();
                 if path_str.ends_with(".ts") && !path_str.ends_with(".d.ts") {
                     if let Ok(content) = fs::read_to_string(path) {
                         // Extraction des enums d'événements
-                        if path_str.contains("/events/") {
+                        if path_str.contains("/events/") || path_str.contains("\\events\\") {
                             for cap in re_enum_entry.captures_iter(&content) {
                                 let key = cap[1].to_string();
                                 let val = cap[2].to_string();
@@ -296,7 +296,7 @@ pub fn build_impact_graph(root_dir: &str) -> AsyncFlowGraph {
     for result in walker_all.flatten() {
         if result.file_type().is_some_and(|ft| ft.is_file()) {
             let path = result.path();
-            let path_str = path.to_string_lossy().to_string();
+            let path_str = path.strip_prefix(root_clean).unwrap_or(path).to_string_lossy().into_owned();
             if !path_str.ends_with(".ts") || path_str.ends_with(".d.ts") {
                 continue;
             }
